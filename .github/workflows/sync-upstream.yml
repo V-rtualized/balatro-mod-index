@@ -12,14 +12,24 @@ jobs:
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
-      - name: Sync fork with upstream
-        uses: TobKed/github-forks-sync-action@master
+      - name: Checkout fork
+        uses: actions/checkout@v4
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          upstream_repository: skyline69/balatro-mod-index
-          upstream_branch: main
-          target_branch: main
-          force: false
+          ref: main
+          fetch-depth: 0
+
+      - name: Merge upstream
+        run: |
+          git config user.name 'Sync Bot'
+          git config user.email 'bot@noreply.github.com'
+          git remote add upstream https://github.com/skyline69/balatro-mod-index.git
+          git fetch upstream main
+          if git merge-base --is-ancestor upstream/main HEAD; then
+            echo "Already up to date"
+          else
+            git merge upstream/main --no-edit
+            git push
+          fi
 
       - name: Create issue on conflict/failure
         if: failure()
