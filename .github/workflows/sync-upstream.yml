@@ -1,11 +1,15 @@
-name: Sync Fork with Upstream
+name: Sync Fork & Build Index
 on:
   schedule:
     - cron: '45 * * * *' # Every hour at :45, after upstream's update finishes (~:30)
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['mods/**']
 
 jobs:
   sync:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - name: Sync fork with upstream
@@ -37,3 +41,32 @@ jobs:
                 labels: ['sync-conflict']
               });
             }
+
+  build-index:
+    needs: [sync]
+    if: ${{ always() && (needs.sync.result == 'success' || needs.sync.result == 'skipped') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Build compiled index
+        run: |
+          python3 -c "
+          import json, pathlib
+          mods = []
+          for meta in sorted(pathlib.Path('mods').glob('*/meta.json')):
+              data = json.loads(meta.read_text())
+              data['_dir'] = meta.parent.name
+              data['_has_thumbnail'] = (meta.parent / 'thumbnail.jpg').exists()
+              mods.append(data)
+          pathlib.Path('index.json').write_text(json.dumps(mods, separators=(',',':')))
+          "
+
+      - name: Commit and push index
+        run: |
+          git config user.name 'Index Bot'
+          git config user.email 'bot@noreply.github.com'
+          git add index.json
+          git diff --cached --quiet || (git commit -m "Update compiled index" && git push)
