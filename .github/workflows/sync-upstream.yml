@@ -27,10 +27,19 @@ jobs:
           if git merge-base --is-ancestor upstream/main HEAD; then
             echo "Already up to date"
           else
-            git merge upstream/main --no-edit
-            # Restore our workflow files — GITHUB_TOKEN can't push workflow changes
+            # Merge upstream, keeping ours on conflict (esp. .github/workflows/)
+            git merge upstream/main --no-edit -X ours || {
+              # Fallback: resolve any remaining conflicts as ours
+              conflicted=$(git diff --name-only --diff-filter=U)
+              if [ -n "$conflicted" ]; then
+                echo "$conflicted" | xargs git checkout --ours --
+                git add $conflicted
+              fi
+              git -c core.editor=true merge --continue
+            }
+            # Always restore our workflow files (GITHUB_TOKEN can't push workflow changes)
             git checkout HEAD^1 -- .github/workflows/
-            git diff --staged --quiet || git commit --amend --no-edit
+            git diff --staged --quiet || git commit -m "Preserve fork workflows"
             git push
           fi
 
