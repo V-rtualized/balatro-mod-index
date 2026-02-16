@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v3
         with:
           fetch-depth: 0  # Get full history for comparing changes
 
@@ -32,7 +32,7 @@ jobs:
           # Use fallback method if API fails
           if echo "$API_RESPONSE" | jq -e 'if type=="array" then true else false end' > /dev/null; then
             echo "Using GitHub API method to find changed files"
-            grep -E '^mods/[^/]+/' changed_files.txt | cut -d'/' -f1-2 | sort -u > changed_mods.txt || true
+            echo "$API_RESPONSE" | jq -r '.[] | .filename' | grep -E '^mods/[^/]+/' | cut -d'/' -f1-2 | sort | uniq > changed_mods.txt
           else
             echo "Using git diff method as fallback"
             # Fetch the base branch of the PR
@@ -125,7 +125,6 @@ jobs:
         with:
           schema: "./schema/meta.schema.json"
           files: ${{ steps.find-changed-mods.outputs.meta_json_files }}
-          all-errors: true
           custom-errors: true
 
       - name: Validate Download URLs
