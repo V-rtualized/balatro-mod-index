@@ -28,6 +28,9 @@ jobs:
             echo "Already up to date"
           else
             git merge upstream/main --no-edit
+            # Restore our workflow files — GITHUB_TOKEN can't push workflow changes
+            git checkout HEAD^1 -- .github/workflows/
+            git diff --staged --quiet || git commit --amend --no-edit
             git push
           fi
 
